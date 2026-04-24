@@ -6,7 +6,6 @@ using Autodesk.Revit.DB.Architecture;
 using RoomManager.Models;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using DwgLine = ACadSharp.Entities.Line;
 
 namespace RoomManager.Services;
@@ -348,66 +347,53 @@ public class DwgRecognitionService
         var matches = new List<RoomTextMatch>();
         if (texts.Count == 0 || rooms.Count == 0) return matches;
 
-        // 第一步：计算候选对（距离 + 文义 + 是否在房间内）
-        var candidates = new List<RoomTextCandidate>();
+        // 第一步：计算每个房间到每个文字的 XY 平面距离
+        var roomTextDistances = new List<(Room room, XYZ center, TextInRevit text, double dist)>();
 
         foreach (var room in rooms)
         {
-            var roomCenter = GetRoomCenter(room);
-            if (roomCenter == null) continue;
-            var roomNameNormalized = NormalizeForMatch(room.Name);
-            var roomNumberNormalized = NormalizeForMatch(room.Number);
-            var roomKeywordGroup = PresetKeywordMatcher.GetKeywordGroup(roomNameNormalized);
+            var roomCenter = (room.Location as LocationPoint)?.Point;
+            if (roomCenter == null)
+            {
+                // 尝试用 BoundingBox 中心
+                var bbox = room.get_BoundingBox(null);
+                if (bbox == null) continue;
+                roomCenter = new XYZ((bbox.Min.X + bbox.Max.X) / 2, (bbox.Min.Y + bbox.Max.Y) / 2, bbox.Min.Z);
+            }
 
             foreach (var text in texts)
             {
                 if (string.IsNullOrWhiteSpace(text.Content)) continue;
-                var normalizedText = NormalizeForMatch(text.Content);
-                if (string.IsNullOrWhiteSpace(normalizedText)) continue;
-
+                
                 var dx = text.Position.X - roomCenter.X;
                 var dy = text.Position.Y - roomCenter.Y;
                 var dist = Math.Sqrt(dx * dx + dy * dy);
-                var textPoint = new XYZ(text.Position.X, text.Position.Y, roomCenter.Z);
-                var insideRoom = IsPointInRoom(textPoint, room);
-
-                if (!insideRoom && dist > maxDistance) continue;
-
-                var distanceScore = Math.Max(0.0, 1.0 - dist / maxDistance);
-                var numberScore = ComputeTextSimilarity(normalizedText, roomNumberNormalized);
-                var nameScore = ComputeTextSimilarity(normalizedText, roomNameNormalized);
-                var keywordGroup = PresetKeywordMatcher.GetKeywordGroup(normalizedText);
-                var keywordScore = !string.IsNullOrWhiteSpace(keywordGroup) && keywordGroup == roomKeywordGroup ? 1.0 : 0.0;
-
-                // 综合得分：优先“文字在房间内”，其次看距离，再看文字/房间名的模糊匹配
-                var semanticScore = Math.Max(numberScore, nameScore * 0.8 + keywordScore * 0.2);
-                var totalScore = (insideRoom ? 0.45 : 0.0) + distanceScore * 0.35 + semanticScore * 0.20;
-
-                candidates.Add(new RoomTextCandidate
+                
+                if (dist <= maxDistance)
                 {
-                    Room = room,
-                    Text = text,
-                    Distance = dist,
-                    IsInsideRoom = insideRoom,
-                    Score = totalScore
-                });
+                    roomTextDistances.Add((room, roomCenter, text, dist));
+                }
             }
         }
 
-        // 第二步：贪心独占匹配 — 按总得分排序，每个文字/房间只能匹配一次
-        candidates.Sort((a, b) => b.Score.CompareTo(a.Score));
+        // 第二步：贪心独占匹配 — 按距离排序，每个文字只能匹配一个房间
+        roomTextDistances.Sort((a, b) => a.dist.CompareTo(b.dist));
+        
         var usedTexts = new HashSet<string>(); // 已被占用的文字（按内容+位置唯一标识）
-        var matchedRooms = new Dictionary<long, RoomTextCandidate>();
+        var matchedRooms = new Dictionary<long, (TextInRevit text, double dist)>();
 
-        foreach (var candidate in candidates)
+        foreach (var (room, center, text, dist) in roomTextDistances)
         {
-            var roomId = candidate.Room.Id.Value;
-            var textKey = $"{NormalizeForMatch(candidate.Text.Content)}@{candidate.Text.Position.X:F2},{candidate.Text.Position.Y:F2}";
+            var roomId = room.Id.Value;
+            var textKey = $"{text.Content}@{text.Position.X:F2},{text.Position.Y:F2}";
+            
+            // 这个文字已被更近的房间占用
             if (usedTexts.Contains(textKey)) continue;
+            
+            // 这个房间已有更近的匹配
             if (matchedRooms.ContainsKey(roomId)) continue;
-            if (candidate.Score < 0.25) continue; // 过滤低质量匹配
-
-            matchedRooms[roomId] = candidate;
+            
+            matchedRooms[roomId] = (text, dist);
             usedTexts.Add(textKey);
         }
 
@@ -418,23 +404,13 @@ public class DwgRecognitionService
             TextInRevit? bestMatch = null;
             double confidence = 0.0;
             MatchStatus status = MatchStatus.NoText;
-            var alternatives = new List<string>();
 
             if (matchedRooms.TryGetValue(roomId, out var matched))
             {
-                bestMatch = matched.Text;
-                confidence = Math.Max(0.1, Math.Min(1.0, matched.Score));
-                status = matched.IsInsideRoom || matched.Distance <= 8.0 ? MatchStatus.Matched : MatchStatus.LowConfidence;
-
-                // 备选结果：按综合分数排序
-                alternatives = candidates
-                    .Where(item => item.Room.Id.Value == roomId)
-                    .OrderByDescending(item => item.Score)
-                    .Select(item => item.Text.Content?.Trim() ?? "")
-                    .Where(content => !string.IsNullOrWhiteSpace(content) && !string.Equals(content, bestMatch.Content?.Trim(), StringComparison.Ordinal))
-                    .Distinct()
-                    .Take(3)
-                    .ToList();
+                bestMatch = matched.text;
+                // 置信度：距离越近越高，3 英尺（约 1 米）以内满分
+                confidence = Math.Max(0.1, Math.Min(1.0, 1.0 - (matched.dist - 3.0) / maxDistance));
+                status = matched.dist <= 10.0 ? MatchStatus.Matched : MatchStatus.LowConfidence;
             }
 
             matches.Add(new RoomTextMatch
@@ -445,65 +421,13 @@ public class DwgRecognitionService
                 MatchedText = bestMatch?.Content ?? "",
                 Confidence = confidence,
                 Status = status,
-                AlternativeTexts = alternatives
+                AlternativeTexts = matchedTexts.Count > 1 
+                    ? matchedTexts.Skip(1).Take(3).Select(t => t.text.Content).ToList() 
+                    : new List<string>()
             });
         }
 
         return matches;
-    }
-
-    private XYZ? GetRoomCenter(Room room)
-    {
-        var location = (room.Location as LocationPoint)?.Point;
-        if (location != null) return location;
-
-        var bbox = room.get_BoundingBox(null);
-        if (bbox == null) return null;
-        return new XYZ((bbox.Min.X + bbox.Max.X) / 2, (bbox.Min.Y + bbox.Max.Y) / 2, (bbox.Min.Z + bbox.Max.Z) / 2);
-    }
-
-    private string NormalizeForMatch(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
-
-        var normalized = value.Trim().ToUpperInvariant();
-        normalized = Regex.Replace(normalized, @"[\s\-_/\\\[\]\(\)【】]+", "");
-        normalized = Regex.Replace(normalized, @"[^\p{L}\p{Nd}]+", "");
-        return normalized;
-    }
-
-    private double ComputeTextSimilarity(string left, string right)
-    {
-        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-            return 0.0;
-
-        if (left == right) return 1.0;
-        if (left.Contains(right) || right.Contains(left)) return 0.9;
-
-        var distance = LevenshteinDistance(left, right);
-        var maxLen = Math.Max(left.Length, right.Length);
-        if (maxLen == 0) return 0.0;
-        return Math.Max(0.0, 1.0 - (double)distance / maxLen);
-    }
-
-    private int LevenshteinDistance(string a, string b)
-    {
-        var d = new int[a.Length + 1, b.Length + 1];
-        for (int i = 0; i <= a.Length; i++) d[i, 0] = i;
-        for (int j = 0; j <= b.Length; j++) d[0, j] = j;
-
-        for (int i = 1; i <= a.Length; i++)
-        {
-            for (int j = 1; j <= b.Length; j++)
-            {
-                int cost = a[i - 1] == b[j - 1] ? 0 : 1;
-                d[i, j] = Math.Min(
-                    Math.Min(d[i - 1, j] + 1, d[i, j - 1] + 1),
-                    d[i - 1, j - 1] + cost);
-            }
-        }
-
-        return d[a.Length, b.Length];
     }
 
     /// <summary>
@@ -693,41 +617,6 @@ public class RoomTextMatch
     public double Confidence { get; set; }
     public MatchStatus Status { get; set; }
     public List<string> AlternativeTexts { get; set; } = new();
-}
-
-internal class RoomTextCandidate
-{
-    public Room Room { get; set; } = null!;
-    public TextInRevit Text { get; set; } = null!;
-    public double Distance { get; set; }
-    public bool IsInsideRoom { get; set; }
-    public double Score { get; set; }
-}
-
-internal static class PresetKeywordMatcher
-{
-    private static readonly Dictionary<string, string[]> KeywordGroups = new()
-    {
-        ["OFFICE"] = new[] { "办公室", "办公", "OFFICE", "OFF" },
-        ["MEETING"] = new[] { "会议室", "会议", "MEETING", "MEET" },
-        ["RESTROOM"] = new[] { "卫生间", "洗手间", "厕所", "RESTROOM", "TOILET", "WC" },
-        ["CORRIDOR"] = new[] { "走廊", "过道", "CORRIDOR", "HALL" },
-        ["STAIR"] = new[] { "楼梯", "楼梯间", "STAIR", "STAIRCASE" },
-        ["STORAGE"] = new[] { "仓库", "储藏", "STORAGE", "STORE" },
-        ["EQUIPMENT"] = new[] { "设备", "机房", "ELECTRIC", "MEP", "机电" }
-    };
-
-    public static string GetKeywordGroup(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return string.Empty;
-        var upper = text.ToUpperInvariant();
-        foreach (var kv in KeywordGroups)
-        {
-            if (kv.Value.Any(keyword => upper.Contains(keyword.ToUpperInvariant())))
-                return kv.Key;
-        }
-        return string.Empty;
-    }
 }
 
 /// <summary>
