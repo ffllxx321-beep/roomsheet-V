@@ -1,0 +1,407 @@
+<Window x:Class="RoomManager.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:RoomManager.ViewModels"
+        xmlns:utils="clr-namespace:RoomManager.Utils"
+        Title="绒姆徐特" 
+        Height="700" Width="1200"
+        WindowStartupLocation="CenterScreen"
+        Background="#F5F5F7"
+        PreviewKeyDown="OnPreviewKeyDown"
+        Closing="MainWindow_Closing">
+
+    <Window.Resources>
+        <!-- Converters -->
+        <utils:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <utils:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+        <utils:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+        <!-- 现代化样式 -->
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Background" Value="#007AFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#0056CC"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#E5E5EA"/>
+            <Setter Property="Foreground" Value="#1C1C1E"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernTextBox" TargetType="TextBox">
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="#E5E5EA"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+
+        <Style x:Key="CardPanel" TargetType="Border">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 顶部工具栏 -->
+        <Border Grid.Row="0" Style="{StaticResource CardPanel}" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 标题 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="" FontSize="24" Margin="0,0,8,0"/>
+                    <TextBlock Text="绒姆徐特" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <!-- 房间数量提示 -->
+                    <TextBlock Text="{Binding TotalRooms, StringFormat={}({0})}" FontSize="14" Foreground="#8E8E93" 
+                               VerticalAlignment="Center" Margin="8,0,0,0"/>
+                </StackPanel>
+
+                <!-- 操作按钮 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="从DWG识别" Style="{StaticResource ModernButton}" Margin="0,0,8,0"
+                            Click="OnImportFromDwg"/>
+                    <Button Content="从Excel导入" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnImportFromExcel"/>
+                    <Button Content="导出" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnExport"/>
+                    <Button Content="PDF报告" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnExportPdf"/>
+                    <Button Content="校验" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnValidate"/>
+                    <Button Content="批量操作" Style="{StaticResource SecondaryButton}" Margin="0,0,8,0"
+                            Click="OnBatchOperation"/>
+                    <Button Content="字段管理" Style="{StaticResource SecondaryButton}"
+                            Click="OnFieldManager"/>
+                    <Button Content="全部保存" Style="{StaticResource ModernButton}" Margin="8,0,0,0"
+                            Click="OnSaveAll"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 主内容区 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧房间列表 -->
+            <Border Grid.Column="0" Style="{StaticResource CardPanel}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 搜索框 + 楼层过滤 -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Style="{StaticResource ModernTextBox}" 
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,6,0">
+                            <TextBox.Template>
+                                <ControlTemplate TargetType="TextBox">
+                                    <Border Background="#F2F2F7" CornerRadius="8" Padding="10,6">
+                                        <Grid>
+                                            <TextBlock Text="搜索..." Foreground="#AEAEB2" FontSize="12"
+                                                       Visibility="{Binding Text, Converter={StaticResource StringToVisibilityConverter}, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                            <ScrollViewer x:Name="PART_ContentHost"/>
+                                        </Grid>
+                                    </Border>
+                                </ControlTemplate>
+                            </TextBox.Template>
+                        </TextBox>
+                        <ComboBox Grid.Column="1" Width="90" FontSize="11" Padding="6,4"
+                                  ItemsSource="{Binding LevelNames}"
+                                  SelectedItem="{Binding SelectedLevel}"
+                                  ToolTip="按楼层过滤"/>
+                    </Grid>
+
+                    <!-- 统计信息 -->
+                    <Border Grid.Row="1" Background="#F2F2F7" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding TotalRooms, StringFormat={}{0} 间}" 
+                                           FontSize="18" FontWeight="Bold"/>
+                                <TextBlock Text="总房间" FontSize="12" Foreground="#8E8E93"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="{Binding CompletedRooms, StringFormat={}{0} 间}" 
+                                           FontSize="18" FontWeight="Bold" Foreground="#34C759"/>
+                                <TextBlock Text="已录入" FontSize="12" Foreground="#8E8E93"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="{Binding IncompleteRooms, StringFormat={}{0} 间}" 
+                                           FontSize="18" FontWeight="Bold" Foreground="#FF9500"/>
+                                <TextBlock Text="待录入" FontSize="12" Foreground="#8E8E93"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- 房间列表 -->
+                    <ListView Grid.Row="2" ItemsSource="{Binding FilteredRooms}"
+                              SelectionChanged="OnRoomListSelectionChanged"
+                              ContextMenuOpening="OnTreeViewContextMenuOpening"
+                              BorderThickness="0" Background="Transparent"
+                              x:Name="RoomListView"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        
+                        <!-- 按楼层分组 -->
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#F2F2F7" CornerRadius="6" Padding="10,6" Margin="0,8,0,4">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" Foreground="#1C1C1E"/>
+                                                <TextBlock Text="{Binding ItemCount, StringFormat={}  ({0})}" 
+                                                           FontSize="12" Foreground="#8E8E93" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
+
+                        <!-- 房间项样式 -->
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <EventSetter Event="MouseDoubleClick" Handler="OnRoomDoubleClick"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,1,0,1"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListViewItem">
+                                            <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" 
+                                                    Padding="10,8" Margin="2,0" Cursor="Hand">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#F2F2F7"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ItemBorder" Property="Background" Value="#E3F2FD"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="#007AFF"/>
+                                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="0,0,3,0"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+
+                        <!-- 房间项模板 -->
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    
+                                    <!-- 编号标签 -->
+                                    <Border Grid.Column="0" Background="#E5E5EA" CornerRadius="4" 
+                                            Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Number}" FontSize="12" FontWeight="SemiBold" 
+                                                   Foreground="#636366"/>
+                                    </Border>
+                                    
+                                    <!-- 名称 -->
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" 
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    
+                                    <!-- 面积 -->
+                                    <TextBlock Grid.Column="2" Text="{Binding Area, StringFormat={}{0:F1}m2}" 
+                                               FontSize="11" Foreground="#8E8E93" VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <!-- 底部操作 -->
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                        <Button Content="全选" Style="{StaticResource SecondaryButton}" Padding="12,6" Margin="0,0,8,0"
+                                Click="OnSelectAll"/>
+                        <Button Content="反选" Style="{StaticResource SecondaryButton}" Padding="12,6" Margin="0,0,8,0"
+                                Click="OnInvertSelection"/>
+                        <Button Content="批量编辑" Style="{StaticResource SecondaryButton}" Padding="12,6"
+                                Click="OnBatchEdit"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 右侧详情面板 -->
+            <Border Grid.Column="2" Style="{StaticResource CardPanel}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 详情标题 -->
+                    <Grid Grid.Row="0" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding SelectedRoom.Name}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedRoom.Number, StringFormat={} [{0}]}" FontSize="14" 
+                                       Foreground="#8E8E93" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="定位" Style="{StaticResource SecondaryButton}" Padding="10,4" FontSize="12"
+                                    Click="OnLocateRoom" Margin="0,0,6,0"/>
+                            <Button Content="保存" Style="{StaticResource ModernButton}" Padding="10,4" FontSize="12"
+                                    Click="OnSaveRoom"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- 参数列表（折叠面板） -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding ParameterGroups}"
+                                      Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Expander IsExpanded="{Binding IsExpanded}" Margin="0,0,0,4">
+                                        <Expander.Header>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding GroupName}" FontSize="12" FontWeight="SemiBold" Foreground="#636366"/>
+                                                <TextBlock Text="{Binding Parameters.Count, StringFormat={} ({0})}" 
+                                                           FontSize="11" Foreground="#AEAEB2" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Expander.Header>
+                                        <ItemsControl ItemsSource="{Binding Parameters}" Margin="8,4,0,4">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,1,0,1" ToolTip="{Binding Name}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="110"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{Binding DisplayName}" 
+                                                                   FontSize="11" Foreground="#8E8E93" 
+                                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBox Grid.Column="1" 
+                                                                 Text="{Binding DisplayValue, UpdateSourceTrigger=PropertyChanged}"
+                                                                 FontSize="11" Padding="4,3" BorderThickness="1"
+                                                                 BorderBrush="#E5E5EA" IsReadOnly="{Binding IsReadOnly}">
+                                                            <TextBox.Style>
+                                                                <Style TargetType="TextBox">
+                                                                    <Setter Property="Background" Value="White"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                                            <Setter Property="Background" Value="#F5F5F7"/>
+                                                                            <Setter Property="Foreground" Value="#636366"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsModified}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#007AFF"/>
+                                                                            <Setter Property="BorderBrush" Value="#007AFF"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBox.Style>
+                                                        </TextBox>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- 状态栏 -->
+                    <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" Foreground="#007AFF" FontSize="12" Margin="0,8,0,0"/>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- 底部状态栏 -->
+        <Border Grid.Row="2" Style="{StaticResource CardPanel}" Margin="0,12,0,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- 未保存提示 -->
+                    <TextBlock Text="*" Foreground="#FF9500" Margin="0,0,4,0" FontSize="10"
+                               Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <TextBlock Text="未保存" Foreground="#FF9500" Margin="0,0,12,0" FontSize="12"
+                               Visibility="{Binding HasUnsavedChanges, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    
+                    <TextBlock Text="提示: 双击房间可快速定位 | Ctrl+Z 撤销 | Ctrl+S 保存" 
+                               Foreground="#8E8E93"/>
+                    <!-- 导入导出状态 -->
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="#007AFF" Margin="24,0,0,0"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"/>
+                    <!-- 加载指示器 -->
+                    <StackPanel Orientation="Horizontal" Margin="12,0,0,0"
+                                Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="" Margin="0,0,6,0"/>
+                        <TextBlock Text="处理中..." Foreground="#FF9500"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- 撤销/重做状态 -->
+                    <TextBlock Foreground="#8E8E93" Margin="0,0,12,0" Text="就绪"/>
+                    <TextBlock Text="{Binding TotalArea, StringFormat=总面积: {0:F2} m²}" 
+                               Foreground="#8E8E93"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,133 @@
+<Window x:Class="RoomManager.Views.FieldManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="字段管理" 
+        Height="520" Width="480"
+        WindowStartupLocation="CenterOwner"
+        Background="#F5F5F7"
+        ResizeMode="NoResize">
+
+    <Window.Resources>
+        <Style x:Key="ModernButton" TargetType="Button">
+            <Setter Property="Background" Value="#007AFF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SecondaryButton" TargetType="Button">
+            <Setter Property="Background" Value="#E5E5EA"/>
+            <Setter Property="Foreground" Value="#1C1C1E"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="字段管理" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="勾选要在详情面板中显示的参数字段" FontSize="12" Foreground="#8E8E93" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <!-- 工具栏 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button Content="全部显示" Style="{StaticResource SecondaryButton}" Click="OnShowAll" Margin="0,0,6,0"/>
+            <Button Content="全部隐藏" Style="{StaticResource SecondaryButton}" Click="OnHideAll" Margin="0,0,6,0"/>
+            <Button Content="仅可编辑" Style="{StaticResource SecondaryButton}" Click="OnShowEditableOnly" Margin="0,0,6,0"/>
+            <Button Content="重置" Style="{StaticResource SecondaryButton}" Click="OnReset"/>
+            <TextBlock x:Name="CountLabel" VerticalAlignment="Center" Margin="12,0,0,0" 
+                       FontSize="12" Foreground="#8E8E93"/>
+        </StackPanel>
+
+        <!-- 字段列表 -->
+        <Border Grid.Row="2" Background="White" CornerRadius="8" BorderBrush="#E5E5EA" BorderThickness="1">
+            <ListView x:Name="FieldsList" BorderThickness="0" Background="Transparent"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.GroupStyle>
+                    <GroupStyle>
+                        <GroupStyle.HeaderTemplate>
+                            <DataTemplate>
+                                <Border Background="#F2F2F7" Padding="8,4" Margin="0,4,0,2">
+                                    <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Foreground="#636366"/>
+                                </Border>
+                            </DataTemplate>
+                        </GroupStyle.HeaderTemplate>
+                    </GroupStyle>
+                </ListView.GroupStyle>
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="8,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Grid.Column="0" IsChecked="{Binding IsVisible}" 
+                                      VerticalAlignment="Center" Margin="0,0,8,0"
+                                      Checked="OnVisibilityChanged" Unchecked="OnVisibilityChanged"/>
+                            <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="12" 
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" FontSize="11" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="可编辑"/>
+                                        <Setter Property="Foreground" Value="#34C759"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsReadOnly}" Value="True">
+                                                <Setter Property="Text" Value="只读"/>
+                                                <Setter Property="Foreground" Value="#AEAEB2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+
+        <!-- 底部按钮 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="完成" Style="{StaticResource ModernButton}" Click="OnCloseClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,58 @@
+<Window x:Class="RoomManager.Views.ManualTextSelectWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="选择房间名文字" 
+        Height="450" Width="500"
+        WindowStartupLocation="CenterOwner"
+        Background="#F5F5F7">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 房间信息 -->
+        <Border Grid.Row="0" Background="White" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+            <StackPanel>
+                <TextBlock FontSize="14" FontWeight="SemiBold">
+                    <Run Text="房间: "/>
+                    <Run x:Name="RoomInfoRun" Foreground="#007AFF"/>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!-- 搜索 -->
+        <TextBox Grid.Row="1" x:Name="SearchBox" Padding="8,6" FontSize="12" Margin="0,0,0,8"
+                 TextChanged="OnSearchChanged">
+            <TextBox.Template>
+                <ControlTemplate TargetType="TextBox">
+                    <Border Background="White" CornerRadius="6" Padding="8,6" BorderBrush="#E5E5EA" BorderThickness="1">
+                        <ScrollViewer x:Name="PART_ContentHost"/>
+                    </Border>
+                </ControlTemplate>
+            </TextBox.Template>
+        </TextBox>
+
+        <!-- 文字列表 -->
+        <ListView Grid.Row="2" x:Name="TextListView" BorderThickness="1" BorderBrush="#E5E5EA"
+                  SelectionChanged="OnTextSelected" MouseDoubleClick="OnTextDoubleClick">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="文字内容" Width="200" DisplayMemberBinding="{Binding Content}"/>
+                    <GridViewColumn Header="图层" Width="120" DisplayMemberBinding="{Binding LayerName}"/>
+                    <GridViewColumn Header="距离" Width="80" DisplayMemberBinding="{Binding Distance}"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+
+        <!-- 底部 -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="取消" Padding="16,8" Margin="0,0,8,0" Click="OnCancel"/>
+            <Button Content="确认" Padding="16,8" Background="#007AFF" Foreground="White" 
+                    BorderThickness="0" Click="OnConfirm"/>
+        </StackPanel>
+    </Grid>
+</Window>
