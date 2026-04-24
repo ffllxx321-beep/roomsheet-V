@@ -210,7 +210,14 @@ public class RoomManagerApplication : IExternalApplication
         {
             // 创建 Ribbon 面板
             string tabName = "绒姆徐特";
-            application.CreateRibbonTab(tabName);
+            try
+            {
+                application.CreateRibbonTab(tabName);
+            }
+            catch (Autodesk.Revit.Exceptions.ArgumentException)
+            {
+                // Tab 已存在时忽略，避免导致插件启动失败
+            }
 
             RibbonPanel panel = application.CreateRibbonPanel(tabName, "房间管理");
 
