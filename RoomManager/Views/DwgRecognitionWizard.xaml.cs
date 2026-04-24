@@ -234,42 +234,14 @@ public partial class DwgRecognitionWizard : Window
 
         using var transaction = new Transaction(_document, "自动放置房间");
         transaction.Start();
-        var options = transaction.GetFailureHandlingOptions();
-        options.SetFailuresPreprocessor(new RoomWarningSwallower());
-        transaction.SetFailureHandlingOptions(options);
 
         try
         {
             // 方式1: 用 Revit 墙体自动放置（如果有 Revit 墙围合的空间）
             try
             {
-                var existingRooms = new FilteredElementCollector(_document)
-                    .OfCategory(BuiltInCategory.OST_Rooms)
-                    .WhereElementIsNotElementType()
-                    .Cast<Room>()
-                    .Where(r => r.Level?.Id == level.Id && r.CreatedPhaseId == phase.Id)
-                    .ToList();
-
-                // 当前楼层+阶段已有房间时，不再重复调用 NewRooms2，避免“同一围合区多个房间”警告
-                if (existingRooms.Count == 0)
-                {
-                    var newRoomIds = _document.Create.NewRooms2(level, phase);
-                    foreach (ElementId roomId in newRoomIds)
-                    {
-                        if (_document.GetElement(roomId) is Room createdRoom)
-                        {
-                            if (IsPlacedRoom(createdRoom))
-                            {
-                                placed++;
-                            }
-                            else
-                            {
-                                // 清理无面积/未正确放置的房间，避免预览重复点击后堆积
-                                _document.Delete(roomId);
-                            }
-                        }
-                    }
-                }
+                var newRoomIds = _document.Create.NewRooms2(level, phase);
+                placed += newRoomIds.Count;
             }
             catch { }
 
@@ -300,15 +272,8 @@ public partial class DwgRecognitionWizard : Window
                             var room = _document.Create.NewRoom(level, point);
                             if (room != null)
                             {
-                                if (IsPlacedRoom(room))
-                                {
-                                    room.Name = regionMatch.MatchedText.Trim();
-                                    placed++;
-                                }
-                                else
-                                {
-                                    _document.Delete(room.Id);
-                                }
+                                room.Name = regionMatch.MatchedText.Trim();
+                                placed++;
                             }
                         }
                         catch { }
@@ -339,15 +304,8 @@ public partial class DwgRecognitionWizard : Window
                         var newRoom = _document.Create.NewRoom(level, point);
                         if (newRoom != null)
                         {
-                            if (IsPlacedRoom(newRoom))
-                            {
-                                newRoom.Name = text.Content.Trim();
-                                placed++;
-                            }
-                            else
-                            {
-                                _document.Delete(newRoom.Id);
-                            }
+                            newRoom.Name = text.Content.Trim();
+                            placed++;
                         }
                     }
                     catch { } // 放不了就跳过（可能不在闭合区域内）
@@ -363,18 +321,6 @@ public partial class DwgRecognitionWizard : Window
         }
 
         return placed;
-    }
-
-    private static bool IsPlacedRoom(Room room)
-    {
-        try
-        {
-            return room.Area > 0 && room.Location is LocationPoint;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private Phase? GetTargetPhase()
@@ -518,22 +464,6 @@ public partial class DwgRecognitionWizard : Window
     {
         DialogResult = false;
         Close();
-    }
-}
-
-internal class RoomWarningSwallower : IFailuresPreprocessor
-{
-    public FailureProcessingResult PreprocessFailures(FailuresAccessor failuresAccessor)
-    {
-        var messages = failuresAccessor.GetFailureMessages();
-        foreach (var msg in messages)
-        {
-            if (msg.GetSeverity() == FailureSeverity.Warning)
-            {
-                failuresAccessor.DeleteWarning(msg);
-            }
-        }
-        return FailureProcessingResult.Continue;
     }
 }
 
